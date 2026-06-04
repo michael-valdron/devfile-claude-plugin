@@ -8,6 +8,7 @@ Claude plugin that contains skills related to devfile development
 
 | Skill | Description |
 |---|---|
+| `building-devfile-registry` | End-to-end workflow: Building a devfile registry using any of the different builds methods and can take a provided custom devfile registry |
 
 ## Installation
 
