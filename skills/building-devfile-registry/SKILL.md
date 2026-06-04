@@ -16,9 +16,9 @@ A devfile registry has two runtime components:
 | **Index server** | Serves REST API, `index.json`, registry viewer |
 | **OCI registry** | Stores stack artifacts as OCI images |
 
-The **devfile index image** (built from your registry repo) contains `index.json` + packaged stacks. Deploy it with the [Registry Operator](https://github.com/devfile/registry-operator) or the [Helm chart](deploy/chart/devfile-registry/README.md).
+The **devfile index image** (built from your registry repo) contains `index.json` + packaged stacks. Deploy it with the [Registry Operator](https://github.com/devfile/registry-operator) or the [Helm chart](https://github.com/devfile/registry-support/blob/main/deploy/chart/devfile-registry/README.md).
 
-Build tools live in this repo under `build-tools/` and `index/generator/`.
+Build tools, the Helm chart, and integration tests live in the separate **[registry-support](https://github.com/devfile/registry-support)** repository under `build-tools/`, `index/generator/`, `deploy/chart/`, and `tests/`. Do not assume the current workspace is a clone of registry-support; clone it when a step needs those tools, or use an existing clone path as `$REGISTRY_SUPPORT`.
 
 ## Task Progress
 
@@ -66,7 +66,7 @@ versions:
   - version: 2.0.0
 ```
 
-**External samples** — root-level `extraDevfileEntries.yaml` references Git repos to cache at build time. See `tests/registry/extraDevfileEntries.yaml` in this repo for examples.
+**External samples** — root-level `extraDevfileEntries.yaml` references Git repos to cache at build time. See https://github.com/devfile/registry-support/blob/main/tests/registry/extraDevfileEntries.yaml for examples.
 
 Each stack directory must contain at least one `devfile.yaml`. Additional files (Dockerfiles, K8s manifests, VSX plugins) are tar-archived automatically during build.
 
@@ -99,17 +99,20 @@ The index generator validates structure during build and fails on errors.
 
 ### Option A: Build from a registry repo (most common)
 
-From a clone of **this** repo (`registry-support`):
+Clone [registry-support](https://github.com/devfile/registry-support) (or set `$REGISTRY_SUPPORT` to an existing clone), then run from its root:
 
 ```bash
+git clone https://github.com/devfile/registry-support.git "${REGISTRY_SUPPORT:-registry-support}"
+cd "${REGISTRY_SUPPORT:-registry-support}"
 bash build-tools/build_image.sh <path-to-registry-repo>
 ```
 
 This runs `build-tools/build.sh`, generates `index.json`, and produces a `devfile-index` Docker image.
 
-For offline/air-gapped builds:
+For offline/air-gapped builds (from the registry-support clone):
 
 ```bash
+cd "${REGISTRY_SUPPORT:-registry-support}"
 bash build-tools/build_image.sh <path-to-registry-repo> 1
 ```
 
@@ -125,14 +128,15 @@ On Apple Silicon targeting amd64 clusters: `export PLATFORM_EV=linux/arm64`.
 
 ### Option C: Develop registry-support components locally
 
-Build all components with mock test data:
+From a clone of [registry-support](https://github.com/devfile/registry-support), build all components with mock test data:
 
 ```bash
+cd "${REGISTRY_SUPPORT:-registry-support}"
 bash build_registry.sh              # linux/amd64
 bash build_registry.sh linux/arm64  # other arch
 ```
 
-Uses `tests/registry/` and produces `devfile-index:latest` via `.ci/Dockerfile`.
+Uses `tests/registry/` in that repo and produces `devfile-index:latest` via `.ci/Dockerfile`.
 
 ---
 
@@ -149,18 +153,21 @@ docker push <registry>/<user>/devfile-index:<tag>
 
 ### Helm (Kubernetes)
 
+From a clone of [registry-support](https://github.com/devfile/registry-support):
+
 ```bash
+cd "${REGISTRY_SUPPORT:-registry-support}"
 helm install devfile-registry deploy/chart/devfile-registry \
   --set global.ingress.domain=<ingress-domain> \
   --set devfileIndex.image=<registry>/<user>/devfile-index \
   --set devfileIndex.tag=<tag>
 ```
 
-OpenShift: add `--set global.isOpenShift=true` or use `helm-openshift-install.sh`.
+OpenShift: add `--set global.isOpenShift=true` or use `deploy/helm-openshift-install.sh` from the same repo.
 
 Headless (no viewer): `--set global.headless=true`.
 
-Full chart options: `deploy/chart/devfile-registry/README.md`.
+Full chart options: [deploy/chart/devfile-registry/README.md](https://github.com/devfile/registry-support/blob/main/deploy/chart/devfile-registry/README.md).
 
 ### Operator (recommended for production)
 
@@ -177,10 +184,12 @@ curl -s https://<registry-host>/v2/index | head
 curl -s https://<registry-host>/devfiles/go/1.2.0
 ```
 
-### Integration tests (from this repo)
+### Integration tests
+
+From a clone of [registry-support](https://github.com/devfile/registry-support):
 
 ```bash
-cd tests/integration
+cd "${REGISTRY_SUPPORT:-registry-support}/tests/integration"
 ./docker-build.sh
 docker run --env REGISTRY=https://<registry-host> \
   --env IS_TEST_REGISTRY=true \
@@ -189,10 +198,15 @@ docker run --env REGISTRY=https://<registry-host> \
 
 For a custom registry with non-standard stacks, omit `IS_TEST_REGISTRY=true`.
 
+See [tests/integration/README.md](https://github.com/devfile/registry-support/blob/main/tests/integration/README.md).
+
 ### registry-library CLI
 
+From a clone of [registry-support](https://github.com/devfile/registry-support):
+
 ```bash
-cd registry-library && bash build.sh
+cd "${REGISTRY_SUPPORT:-registry-support}/registry-library"
+bash build.sh
 ./registry-library list https://<registry-host>
 ```
 
@@ -202,17 +216,18 @@ cd registry-library && bash build.sh
 
 | Goal | Path |
 |------|------|
-| Custom registry for my team | Fork `devfile/registry` → Option A build → Helm/Operator deploy |
+| Custom registry for my team | Fork [devfile/registry](https://github.com/devfile/registry) → Option A build (via [registry-support](https://github.com/devfile/registry-support)) → Helm/Operator deploy |
 | Contribute stacks to community registry | PR to https://github.com/devfile/registry |
-| Develop index server / build tools | Option C (`build_registry.sh`) in this repo |
+| Develop index server / build tools | Clone [registry-support](https://github.com/devfile/registry-support) → Option C (`build_registry.sh`) |
 
 ---
 
 ## Additional resources
 
 - Registry repo layout & index schema: [reference.md](reference.md)
-- Build tools: `build-tools/README.md`
-- Index server API: `index/server/README.md`
-- Deploy chart: `deploy/chart/devfile-registry/README.md`
-- Integration tests: `tests/integration/README.md`
+- [registry-support](https://github.com/devfile/registry-support) — build tools, index server, Helm chart, integration tests
+- Build tools: [build-tools/README.md](https://github.com/devfile/registry-support/blob/main/build-tools/README.md)
+- Index server API: [index/server/README.md](https://github.com/devfile/registry-support/blob/main/index/server/README.md)
+- Deploy chart: [deploy/chart/devfile-registry/README.md](https://github.com/devfile/registry-support/blob/main/deploy/chart/devfile-registry/README.md)
+- Integration tests: [tests/integration/README.md](https://github.com/devfile/registry-support/blob/main/tests/integration/README.md)
 - Official docs: https://devfile.io/docs/2.3.0/building-a-custom-devfile-registry
